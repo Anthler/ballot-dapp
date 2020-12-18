@@ -11,42 +11,51 @@ contract Ballot {
     }
 
     struct Proposal {
-        bytes32 name; 
+        string name; 
         uint voteCount;
     }
 
     string public description;
     uint public startDate;
     uint public endDate;
-    bytes[] public attachedDocs;
+    //bytes[] public attachedDocs;
+    bytes public attachedDoc;
     address public chairperson;
     mapping(address => Voter) public voters;
-    Proposal[] public proposals;
+    mapping(uint => Proposal) public proposals;
+    uint public proposalsCount;
 
-
+    enum State{Init, Started, Ended, Closed}
+    State public state;
+    
     constructor(
-        bytes32[] memory proposalNames, 
-        string memory description, 
-        bytes[] memory _attachedDocs, 
-        uint startDate, 
-        uint endDate
+        string[] memory _proposalNames, 
+        string memory _description, 
+        bytes memory _attachedDoc, 
+        uint _startDate, 
+        uint _endDate
     ) public {
-        chairperson = msg.sender;
+        chairperson = tx.origin;
         voters[chairperson].weight = 1;
-        for(uint i = 0; i < _attachedDocs.length; i++){
-            attachedDocs.push(_attachedDocs[i]);
-        }
+        description = _description;
+        startDate = _startDate;
+        endDate = _endDate;
+        
+        attachedDoc = _attachedDoc;
+        
 
-        for (uint i = 0; i < proposalNames.length; i++) {
-            proposals.push(Proposal({
-                name: proposalNames[i],
+        for (uint i = 0; i < _proposalNames.length; i++) {
+            proposalsCount++;
+            
+            proposals[proposalsCount] = Proposal({
+                name: _proposalNames[i],
                 voteCount: 0
-            }));
+            });
         }
 
-        for(uint i = 0; i < _attachedDocs.length; i++){
-            attachedDocs.push(attachedDocs[i]);
-        }
+        // for(uint i = 0; i < _attachedDocs.length; i++){
+        //     attachedDocs.push(_attachedDocs[i]);
+        // }
     }
 
     function giveRightToVote(address voter) public {
@@ -89,7 +98,7 @@ contract Ballot {
             returns (uint winningProposal_)
     {
         uint winningVoteCount = 0;
-        for (uint p = 0; p < proposals.length; p++) {
+        for (uint p = 0; p <= proposalsCount; p++) {
             if (proposals[p].voteCount > winningVoteCount) {
                 winningVoteCount = proposals[p].voteCount;
                 winningProposal_ = p;
@@ -98,8 +107,17 @@ contract Ballot {
     }
 
     function winnerName() public view
-            returns (bytes32 winnerName_)
+            returns (string memory winnerName_)
     {
         winnerName_ = proposals[winningProposal()].name;
     }
+
+    function close() public {
+        require(msg.sender == chairperson, "You are not authorized to carry this action");
+        state = State.Closed;
+    }
+
+    // function getAttachedDocuments() public view returns(bytes[] memory){
+    //     return attachedDocs;
+    // }
 }

@@ -1,23 +1,26 @@
-import React, { useEffect, useState } from "react";
+import React, { Component,useEffect, useState } from "react";
 import BallotFactory from "./contracts/BallotFactory.json";
 import getWeb3 from "./getWeb3";
-
+import { Form, FormGroup, Label, Input, FormText, Container } from 'reactstrap';
 import "./App.css";
 
-const NewBallot = () =>  {
+class NewBallot extends Component {
 
-  const [state, setState] = useState({
+  state = {
       web3: '', 
       accounts: [], 
       contract: '', 
       description: '', 
       options:[],
       startDate: '',
-      endDate: ''
-    })
+      endDate: '',
+      startTime: '',
+      endTime: '',
+      files: '',
+      errorMessage: ''
+    }
   
-  useEffect(() => {
-    const init = async() => {
+    componentDidMount = async() => {
       try {
         const web3 = await getWeb3();
         const accounts = await web3.eth.getAccounts();
@@ -27,10 +30,7 @@ const NewBallot = () =>  {
           BallotFactory.abi,
           deployedNetwork && deployedNetwork.address
         );
-
-        setState({web3, accounts, contract: instance});
-        console.log(accounts)
-
+        this.setState({web3, accounts, contract: instance});
       } catch(error) {
 
         alert(
@@ -39,30 +39,141 @@ const NewBallot = () =>  {
         console.error(error);
       }
     }
-    init();
-  }, []);
 
-  const handleSubmit = async () =>{
-      const {options, description, startDate, endDate} = state;
-      try {
-            const response = await state.contract.methods.createBallot(options, description, startDate, endDate).send({from: accounts[0]});
-            setState({description: '', options: [], startDate:'', endDate:''});
-      } catch (error) {
-           console.log(error)
+
+  handleSubmit = async (event) => {
+    event.preventDefault();
+    const {options, description, files, startDate, startTime, endDate, endTime, accounts} = this.state;
+    console.log(options)
+    let startDateTimestamp = Date.parse(startDate)
+    let endDateTimestamp = Date.parse(endDate)
+    const fileHashes = await this.state.web3.utils.soliditySha3(files)
+    
+    try {
+      const response = await this.state.contract.methods.createElection(
+        options, 
+        description, 
+        fileHashes,
+        startDateTimestamp,
+        endDateTimestamp
+      ).send({from: accounts[0]});
+  
+      if(response){
+        alert('created successfully')
+        this.setState({option: [], description: '', files: '', startDate: '', startTime: '', endDate: '', endTime: ''})
       }
-  }
+    } catch (error) {
+        this.setState({errorMessage: 'You are not authorized to perform this action'})
+    }
+    
+}
 
-  return(
-    <div>
-      <section>
-        <h2>Hello World</h2>
-      </section>
-      <form onSubmit={handleSubmit}>
-          <input type='text' onChange={(e) => setState({description:e.target.value})}/>
-          <button>Submit</button>
-      </form>
-    </div>
-  )
+handleInputChange = (event) => {
+    
+    const target = event.target;
+    const value = target.value;
+    const name = target.name;
+    this.setState({
+        [name]: value
+    });
+}
+
+handleMultiSelect = (e) =>{
+  let value = Array.from(e.target.selectedOptions, option => option.value);
+  this.setState({options: value})
+}
+
+// handleFilesUpload = (e) => {
+//   let files = e.target.files;
+//   let value = Array.from(files, )
+//   for (let i = 0; i < files.length; i++) {
+//     formData.append(`images[${i}]`, files[i])
+//   }
+// }
+
+
+render(){
+  if(!this.state.errorMessage){
+    return(
+      <Container>
+        <Form onSubmit={this.handleSubmit}>
+          <FormGroup>
+            <Label for="exampleDate">Start Date</Label>
+            <Input
+              type="date"
+              name="startDate"
+              id="exampleDate"
+              placeholder=" start date"
+              onChange={this.handleInputChange}
+            />
+          </FormGroup>
+          {/* <FormGroup>
+            <Label for="exampleTime">Start Time</Label>
+            <Input
+              type="time"
+              name="startTime"
+              id="exampleTime"
+              placeholder="start time"
+              onChange={this.handleInputChange}
+            />
+          </FormGroup> */}
+  
+          <FormGroup>
+            <Label for="exampleDate">End Date</Label>
+            <Input
+              type="date"
+              name="endDate"
+              id="exampleDate"
+              placeholder="date placeholder"
+              onChange={this.handleInputChange}
+            />
+          </FormGroup>
+          {/* <FormGroup>
+            <Label for="exampleTime">End Time</Label>
+            <Input
+              type="time"
+              name="endTime"
+              id="exampleTime"
+              placeholder="end time"
+              onChange={this.handleInputChange}
+            />
+          </FormGroup> */}
+          <FormGroup>
+            <Label for="exampleSelectMulti">Select Multiple</Label>
+            <Input
+              type="select"
+              name="options"
+              id="exampleSelectMulti"
+              multiple
+              onChange={this.handleMultiSelect}
+            >
+              <option>YES</option>
+              <option>NO</option>
+              {/* <option>NOT SURE</option>
+              <option>UNDECIDED</option> */}
+            </Input>
+          </FormGroup>
+          <FormGroup>
+            <Label for="exampleText">Description</Label>
+            <Input type="textarea" name="description" id="exampleText" onChange={this.handleInputChange}/>
+          </FormGroup>
+          <FormGroup>
+            <Label for="exampleFile">File</Label>
+            <Input type="file" name="files" id="exampleFile" onChange={this.handleInputChange} />
+            <FormText color="muted">
+              select attached documents
+            </FormText>
+          </FormGroup>
+          <button type="submit">Create</button>
+        </Form>
+        </Container>
+      );
+  }else{
+    return(
+      <h1> {this.state.errorMessage} </h1>
+    )
+  }
+  }
 
 }
 

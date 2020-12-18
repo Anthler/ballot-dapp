@@ -1,69 +1,69 @@
-import React, { useEffect, useState } from "react";
+import React, {Component } from "react";
 import BallotFactory from "./contracts/BallotFactory.json";
-import  Ballot  from "./contracts/Ballot.json";
 import getWeb3 from "./getWeb3";
 import "./App.css";
+import Header from "./HeaderComponent.js"
+import NewBallot from "./NewBallot";
+import RenderElections from "./RenderElections";
+import MetamaskAlert from "./MetamaskAlert";
+import { BrowserRouter, Switch,Route, Redirect} from "react-router-dom";
+import { Container } from "reactstrap";
 
-const App = () =>  {
-
-  const [state, setState] = useState({web3: '', accounts: [], contract: ''})
-  const [elections, setElections] = useState([]);
+class App extends Component{
   
-  useEffect(() => {
+  state = {
+    web3: '', 
+    accounts: [], 
+    contract: '',
+    elections:[],
+    metamaskInstalled: false
+  }
 
-    const init = async() => {
-      try {
-        const web3 = await getWeb3();
-        const accounts = await web3.eth.getAccounts();
-        const networkId = await web3.eth.net.getId();
-        const deployedNetwork = BallotFactory.networks[networkId];
-        const instance = new web3.eth.Contract(
-          BallotFactory.abi,
-          deployedNetwork && deployedNetwork.address
-        );
+  async componentDidMount(){
+    try {
+      const metamaskInstalled = typeof(window.web3) !== 'undefined' ;
+      this.setState({metamaskInstalled});
+      const web3 = await getWeb3();
+      const accounts = await web3.eth.getAccounts();
+      const networkId = await web3.eth.net.getId();
+      const deployedNetwork = BallotFactory.networks[networkId];
 
-        setState({web3, accounts, contract: instance});
-        renderElectionsList();
-        console.log(state.contract)
+      const instance =  new web3.eth.Contract(
+        BallotFactory.abi,
+        deployedNetwork && deployedNetwork.address
+      );
+      const elections = await instance.methods.getAllElections().call();
+      this.setState({contract: instance, accounts, elections, web3});
 
-      } catch(error) {
-
-        alert(
-          `Failed to load web3, accounts, or contract. Check console for details.`,
-        );
-        console.error(error);
-      }
+    } catch (error){
+      console.log(error)
     }
-    init();
-  }, []);
+  }
 
-  const renderElectionsList = () => {
-    var allElections = elections;
-    if (allElections.length === 0) {return null}
+render () { 
 
-    const totalElections = elections.length
-    let electionsList = []
-    var i
-    for (i = 0; i < totalElections; i++) {
-      let election = new state.web3.eth.Contract(Ballot.abi, elections[i]);
-      electionsList.push(election)
-      setElections(electionsList);
-    }
+  const ElectionsList = this.state.elections.map((address, i) =>{
+        return <RenderElections key={i} election={address} />
+    })
 
-    return(
-      elections.map((election) => {
-        return(
-            <div>
-                <h1>{election.description}</h1>
-                <h2>{election.startDate}</h2>
-                <h2>{election.endDate}</h2>
-                {election.options.map( option => {
-                  return(<h3>{option}</h3>)
-                })}
-            </div>
-        )
-      })
+    if (!this.state.metamaskInstalled) {
+      return (<MetamaskAlert />)
+    }else{
+
+  return(
+    <BrowserRouter>
+      <div className="app">
+        <Container>
+          <Header /><br/>
+          <Switch>
+              <Route exact path="/" component={() => ElectionsList}/>
+              <Route path="/newpoll" component={NewBallot} />
+          </Switch>
+        </Container>
+        </div>
+    </BrowserRouter>
     )
+   }
 }
 }
 
